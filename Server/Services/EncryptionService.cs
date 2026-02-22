@@ -21,39 +21,60 @@ namespace SubTube.Server.Services
 
         public string EncryptString(string plaintext)
         {
-            using var aes = Aes.Create();
-            aes.Key = _key;
-            aes.GenerateIV();
+            // Encrypt using AES-GCM to provide confidentiality and integrity.
+            var plaintextBytes = Encoding.UTF8.GetBytes(plaintext ?? string.Empty);
 
-            using var encryptor = aes.CreateEncryptor();
-            using var ms = new MemoryStream();
-            ms.Write(aes.IV, 0, aes.IV.Length);
-            using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
-            using (var sw = new StreamWriter(cs))
+            // Recommended nonce size for GCM is 12 bytes.
+            byte[] nonce = new byte[12];
+            RandomNumberGenerator.Fill(nonce);
+
+            byte[] ciphertext = new byte[plaintextBytes.Length];
+            byte[] tag = new byte[16]; // 128-bit authentication tag
+
+            using (var aesGcm = new AesGcm(_key))
             {
-                sw.Write(plaintext);
+                aesGcm.Encrypt(nonce, plaintextBytes, ciphertext, tag);
             }
-            return Convert.ToBase64String(ms.ToArray());
+
+            // Combine nonce + tag + ciphertext for storage/transmission.
+            byte[] combined = new byte[nonce.Length + tag.Length + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, combined, 0, nonce.Length);
+            Buffer.BlockCopy(tag, 0, combined, nonce.Length, tag.Length);
+            Buffer.BlockCopy(ciphertext, 0, combined, nonce.Length + tag.Length, ciphertext.Length);
+
+            return Convert.ToBase64String(combined);
         }
 
         public string DecryptString(string ciphertext)
         {
-            var fullCipher = Convert.FromBase64String(ciphertext);
-            using var aes = Aes.Create();
-            aes.Key = _key;
+            var combined = Convert.FromBase64String(ciphertext);
 
-            var iv = new byte[aes.BlockSize / 8];
-            Buffer.BlockCopy(fullCipher, 0, iv, 0, iv.Length);
-            aes.IV = iv;
+            // combined = nonce (12) || tag (16) || ciphertext
+            const int nonceSize = 12;
+            const int tagSize = 16;
 
-            var cipher = new byte[fullCipher.Length - iv.Length];
-            Buffer.BlockCopy(fullCipher, iv.Length, cipher, 0, cipher.Length);
+            if (combined.Length < nonceSize + tagSize)
+            {
+                throw new CryptographicException("Ciphertext is too short.");
+            }
 
-            using var decryptor = aes.CreateDecryptor();
-            using var ms = new MemoryStream(cipher);
-            using var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read);
-            using var sr = new StreamReader(cs);
-            return sr.ReadToEnd();
+            byte[] nonce = new byte[nonceSize];
+            byte[] tag = new byte[tagSize];
+            byte[] actualCiphertext = new byte[combined.Length - nonceSize - tagSize];
+
+            Buffer.BlockCopy(combined, 0, nonce, 0, nonceSize);
+            Buffer.BlockCopy(combined, nonceSize, tag, 0, tagSize);
+            Buffer.BlockCopy(combined, nonceSize + tagSize, actualCiphertext, 0, actualCiphertext.Length);
+
+            byte[] plaintextBytes = new byte[actualCiphertext.Length];
+
+            using (var aesGcm = new AesGcm(_key))
+            {
+                // Will throw CryptographicException if authentication fails (tampering detected).
+                aesGcm.Decrypt(nonce, actualCiphertext, tag, plaintextBytes);
+            }
+
+            return Encoding.UTF8.GetString(plaintextBytes);
         }
     }
 }
