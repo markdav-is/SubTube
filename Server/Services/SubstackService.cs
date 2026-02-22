@@ -72,7 +72,10 @@ namespace SubTube.Server.Services
 
             feed.LastCheckedOn = DateTime.UtcNow;
             if (posts.Count > 0)
-                feed.LastPostGuid = posts[0].Guid;
+            {
+                var newestPost = posts.OrderByDescending(p => p.PublishedDate).First();
+                feed.LastPostGuid = newestPost.Guid;
+            }
 
             _feedRepository.UpdateFeed(feed);
 
