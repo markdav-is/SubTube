@@ -45,7 +45,7 @@ namespace SubTube.Server.Services
                     var queueClient = new QueueClient(connectionString, queueName,
                         new QueueClientOptions { MessageEncoding = QueueMessageEncoding.Base64 });
                     await queueClient.CreateIfNotExistsAsync();
-                    var messageJson = JsonSerializer.Serialize(saved);
+                    var messageJson = JsonSerializer.Serialize(new { JobId = saved.JobId, UserId = saved.UserId });
                     await queueClient.SendMessageAsync(messageJson);
                     _logger.LogInformation("Enqueued job {JobId} to Azure Queue {QueueName}", saved.JobId, queueName);
                 }
