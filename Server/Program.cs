@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Oqtane.Extensions;
 using Oqtane.Infrastructure;
 using Oqtane.Shared;
+using SubTube.Server.Services;
 
 namespace SubTube.Server
 {
@@ -27,6 +28,9 @@ namespace SubTube.Server
             var configuration = configurationBuilder.Build();
 
             builder.Services.AddOqtane(configuration, builder.Environment);
+
+            // SubTube background service (scoped services registered via SubTubeServerStartup)
+            builder.Services.AddHostedService<RssPollingService>();
 
             var app = builder.Build();
 
