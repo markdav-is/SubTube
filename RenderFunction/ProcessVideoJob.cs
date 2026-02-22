@@ -14,7 +14,27 @@ namespace SubTube.RenderFunction
             FunctionContext context)
         {
             var logger = context.GetLogger<ProcessVideoJob>();
-            var job = JsonSerializer.Deserialize<SubTubeJob>(messageJson);
+            SubTubeJob job;
+            try
+            {
+                job = JsonSerializer.Deserialize<SubTubeJob>(messageJson);
+            }
+            catch (JsonException ex)
+            {
+                logger.LogError(ex, "Failed to deserialize queue message into SubTubeJob. Message: {MessageJson}", messageJson);
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Unexpected error while deserializing queue message into SubTubeJob. Message: {MessageJson}", messageJson);
+                return;
+            }
+
+            if (job is null)
+            {
+                logger.LogError("Deserialized SubTubeJob was null. Message: {MessageJson}", messageJson);
+                return;
+            }
             logger.LogInformation(
                 "Processing job {JobId} for user {UserId}", job.JobId, job.UserId);
 
