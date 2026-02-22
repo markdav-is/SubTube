@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Server\SubTube.Server.csproj" DefaultStartup="true" />
+  <Project Path="Client\SubTube.Client.csproj" />
+  <Project Path="Shared\SubTube.Shared.csproj" />
+</Solution>
